@@ -68,7 +68,9 @@ Input:
 
 Processing:
 - Search prase: generate a search phrase based on requirements
-- filtering phrase: using ai to generate rule based filtering
+- filtering phrase:
+    1. structure retrieval: using llm to generate rules / sql
+    2. unstructure indexing: using sentence transformer (or similar)
 
 Output:
 - list of relevant job offers
@@ -93,9 +95,11 @@ Scrapers:
 Database:
 - PostgreSQL (better)
 - MongoDB
+- airflow
 
 Vector indexing:
-- 
+- qdrant
+- elasticsearch
 
 Simple NLP libraries:
 - re
@@ -103,6 +107,8 @@ Simple NLP libraries:
 - nltk / gensim
 - RapidFuzz
 - langdetect
+
+## Ideas
 
 Things done:
 - DONE add try except for scrapers since they don't work all the time
@@ -119,7 +125,6 @@ Next things to do (priority order):
 - explore more search libraries
 - add a searching company tools on the internet (like AI companies in Germany)
 
-Ideas:
 Ideas on LLMs:
 - knowledge distillation (from gpt4o to small model specific for job offers data extraction)
 - embedding LLM finetuning with feedback implementation (good/bad suggestion)
@@ -179,6 +184,40 @@ erDiagram
     COMPANIES ||--o{ JOBS : "offer"
 ```
 
+## Architercure
+
+```mermaid
+graph TD
+    A[Frontend] --> B[Backend]
+    B --> C[Database]
+    B --> D[AI Filtering Service]
+    B --> E[Scraping Service]
+```
+
+## Versions
+
+This project is not small so let's give it a priority to task, and make versions:
+
+1. Minimal working tool
+- Database: only jobs (postgres + indexing tool)
+- Ranking: only embedding llm
+- Scraping: use jobspy (recurrent)
+- Frontend: simple streamlit dashboard
+- Deploy: place everything on cloud (with working link)
+
+2. Add companies:
+- Scraping: retrieve company info (like score)
+- Database: add companies
+- Ranking: filter by bad score
+
+3. Add structured metadata:
+- Database: add metadata field
+- Ranking: add model to extract structured data
+
+4. Trainings...
+- distill big model to small one
+- add feedback system?
+- training embedding llm model
 
 
 
