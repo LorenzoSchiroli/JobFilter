@@ -22,3 +22,12 @@ dependencies = [
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.2.0"
+ruff = "^0.11.12"
+mypy = "^1.16.0"
+
+[tool.poetry.scripts]
+setup = "jobfilter.scripts.scripts:setup"
+

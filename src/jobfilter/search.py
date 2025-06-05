@@ -2,33 +2,24 @@
 
 #%% search phase
 
-import csv
 from jobspy import scrape_jobs
 
 import pandas as pd
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.components.retrievers.in_memory import InMemoryBM25Retriever
-from haystack import Pipeline
 from haystack import Document
-from haystack.components.generators import HuggingFaceLocalGenerator, HuggingFaceAPIGenerator
-from haystack.components.generators.chat import HuggingFaceAPIChatGenerator, HuggingFaceLocalChatGenerator
 from haystack.dataclasses import ChatMessage
-from haystack.components.builders import PromptBuilder
-from haystack.components.writers import DocumentWriter
-from haystack.document_stores.types import DuplicatePolicy
 from haystack_integrations.components.generators.ollama import OllamaChatGenerator
 
+import re
 import PyPDF2
 
 import time
 
-from huggingface_hub import login
-
-from haystack.utils import Secret
 from tqdm import tqdm
 import copy
 import argparse
-from scrapers.company_scraper import get_company_size
+from jobfilter.scrapers.company_scraper import get_company_size
 
 from langdetect import detect
 
@@ -183,9 +174,6 @@ def filter_jobs(jobs_info, cv, generator):
 
     return matched_jobs
 
-
-import re
-
 def is_full_time(job_offer_text):
     full_time_keywords = ['full-time', 'full time', 'permanent', 'regular', 'fulltime']
     part_time_keywords = ['part-time', 'part time', 'parttime','freelance', 'hourly', "internship"]
@@ -255,7 +243,7 @@ Output example:
         match = re.search(r'(\{.*?\})', reply_match)
         json_text = match.group(1) if match else {}
         reply_match = json.loads(json_text)
-    except Exception as e:
+    except Exception:
         reply_match = {}
 
     print(reply_match)

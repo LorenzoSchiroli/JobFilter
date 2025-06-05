@@ -4,7 +4,6 @@ Company size scraper thrugh google search description.
 
 from googlesearch import search
 import re
-import time
 
 from haystack.dataclasses import ChatMessage
 from haystack_integrations.components.generators.ollama import OllamaChatGenerator
@@ -35,7 +34,7 @@ def get_company_size(company_name, generator):
         # time.sleep(3)  # try reduce search query frequecy
         results = search(search_query, advanced=True, num_results=1)
         description = next(results).description
-    except Exception as e:
+    except Exception:
         print("Googlesearch not working")
         return None
     # description = "Nov 5, 2024 — As of FY 2024, the total number of employees had reached around 164 thousand (only counting full-time equivalent), up from 161 thousand recorded in the ..."
