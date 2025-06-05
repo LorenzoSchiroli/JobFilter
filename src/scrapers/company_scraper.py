@@ -19,7 +19,7 @@ def description2employees_llm(text, generator):
     messages = [ChatMessage.from_user(query)]
     response = generator.run(messages)
     reply = response["replies"][0]
-    number_text = reply.content
+    number_text = reply.text
     number = extract_first_number(number_text)
     return number
 

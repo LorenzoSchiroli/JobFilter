@@ -49,9 +49,9 @@ def get_jobs(generator):
     jobs = scrape_jobs(
         site_name=["indeed", "linkedin", "zip_recruiter", "glassdoor", "google"],
         search_term="software engineer",
-        google_search_term="software engineer jobs near San Francisco, CA since yesterday",
-        location="San Francisco, CA",
-        results_wanted=2,
+        google_search_term="software engineer jobs near Munich, BY since yesterday",
+        location="Munich, germany",
+        results_wanted=10,
         hours_old=72,
         country_indeed='Germany',
         
@@ -143,7 +143,7 @@ def get_search_query(cv, generator):
                 ChatMessage.from_user(search_query_request)]
     response = generator.run(messages)
     reply_query = response["replies"][0]
-    index_query = reply_query.content
+    index_query = reply_query.text
 
     # force manual
     index_query = "data scientist remote german company"
@@ -168,9 +168,9 @@ def filter_jobs(jobs_info, cv, generator):
     retriever = InMemoryBM25Retriever(document_store=document_store)
 
     messages = [ChatMessage.from_system("\\nYou are a helpful, respectful and honest assistant")]
-    messages.append(ChatMessage.from_user("Extract query form the CV: \n" + cv))
+    messages.append(ChatMessage.from_user("Extract a search query form the CV to find the best suited job, use fiew keywords (10 maximum). Just write the query without comments. The CV: \n" + cv))
     response = generator.run(messages)
-    index_query = response["replies"][0].content
+    index_query = response["replies"][0].text
 
     documents_candidate = retriever.run(query=index_query)["documents"]
 
@@ -201,7 +201,7 @@ def is_full_time(job_offer_text):
 def rule_based_filtering(job_info):
 
     checks = {}
-    job_text = job_text.lower()
+    job_text = job_info["description"].lower()
     checks["junior_mid"] = "senior" not in job_text # risky
     checks["english_text"] = True if detect(job_info["description"]) == "en" else False
     checks["company_established"] = "startup" not in job_text
@@ -228,20 +228,20 @@ Job offer conditions:
 - "company_size": check if the job offer's company has more than 100 employees.
 - "permament_position": check if the job is a normal job and not an internship.
 """ \
-        "\nMoreover, check if the curriculum vitae role ambitions match with the the job offer role. Answer True or False or None. \n \n" \
+        "\nMoreover, check if the curriculum vitae role ambitions match with the the job offer role. Answer true or false or null. \n \n" \
         """
 Don't explain details, write output as a json file.
 Output example:
 
 {
-    "junior_mid": False,
-    "english_text": False,
-    "company_established": False,
-    "full_time": False,
-    "reomte": False,
-    "company_size": False,
-    "permament_position": False,
-    "match": False
+    "junior_mid": null,
+    "english_text": null,
+    "company_established": null,
+    "full_time": null,
+    "reomte": null,
+    "company_size": null,
+    "permament_position": null,
+    "match": null
 }
 """
     # "If all conditions are NOT FALSE and the job offer is a MATCH, answer just PASSED, otherwise FAILED." \
@@ -249,9 +249,9 @@ Output example:
     messages_side = copy.deepcopy(messages)
     messages_side.append(ChatMessage.from_user(match_request))
     response = generator.run(messages_side)
-    reply_match = response["replies"][0].content
+    reply_match = response["replies"][0].text
     try:
-        reply_match = reply_match.replace("\n", "").replace("true", "True").replace("false", "False")
+        reply_match = reply_match.replace("\n", "") #.replace("true", "True").replace("false", "False").replace("null", "None").replace("none", "None")
         match = re.search(r'(\{.*?\})', reply_match)
         json_text = match.group(1) if match else {}
         reply_match = json.loads(json_text)
@@ -362,8 +362,8 @@ def find_jobs(cv_path):
     generator = get_generator()
     # jobs, cv = get_example()
     cv = pdf_to_text(cv_path)
+
     jobs = get_jobs(generator)
-    
 
     filtered_jobs = filter_jobs(jobs, cv, generator)
 
