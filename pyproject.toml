@@ -31,3 +31,16 @@ mypy = "^1.16.0"
 [tool.poetry.scripts]
 setup = "jobfilter.scripts.scripts:setup"
 
+
+[tool.mypy]
+strict = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "C", "N", "Q"]  # Enable specific linting rules
+fixable = ["ALL"]  # Allow Ruff to fix all fixable issues
+

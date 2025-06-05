@@ -12,10 +12,12 @@ pip install poetry
 
 3. Install dependencies
 ```bash
-poetry install
+poetry install && poetry run setup
 ```
 
 4. Install ollama: https://ollama.com/download
+
+**Note**: substitute poetry with uv (seems better)
 
 ## Behavior
 
