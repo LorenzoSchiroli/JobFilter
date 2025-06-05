@@ -15,6 +15,8 @@ pip install poetry
 poetry install
 ```
 
+4. Install ollama: https://ollama.com/download
+
 ## Behavior
 
 Input:
@@ -84,6 +86,7 @@ Interesting links:
 LLMs:
 - https://github.com/langchain-ai/langchain (llm pipelines)
 - https://github.com/deepset-ai/haystack (llm pipelines)
+- Also: llamaindex, txtai
 
 Scrapers:
 - https://github.com/Bunsly/JobSpy (search job offers)
@@ -91,6 +94,7 @@ Scrapers:
 - https://github.com/alirezamika/autoscraper
 - https://github.com/joeyism/linkedin_scraper (linkedin person or company scraper, it requires chrome and an email-password)
 - selenium
+- Other: Crawl4AI, FireCrawl, ScrapeGraphAI
 
 Database:
 - PostgreSQL (better)
@@ -100,6 +104,7 @@ Database:
 Vector indexing:
 - qdrant
 - elasticsearch
+- Also: Chroma, Pinecone, Weaviate, Milvus
 
 Simple NLP libraries:
 - re
@@ -107,6 +112,12 @@ Simple NLP libraries:
 - nltk / gensim
 - RapidFuzz
 - langdetect
+
+Text embeddings: NOMIC, SBERT, BGE, Ollama
+
+Evaluation: Giskard, ragas, trulens
+
+Document extraction: MegaParser, Docling, Llama Parse, ExtractThinker
 
 ## Ideas
 
