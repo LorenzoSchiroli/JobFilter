@@ -53,7 +53,7 @@ def get_jobs(generator: OllamaChatGenerator) -> pd.DataFrame:
         country_indeed="Germany",
     )
     print(f"Found {len(jobs)} jobs")
-    unique_companies = jobs["company"].unique()
+    unique_companies = jobs["company"].dropna().unique()
     print("Number of companies:", len(unique_companies))
     mapping = {
         company: get_company_size(company, generator)
@@ -427,7 +427,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-f", "--file",
         type=str,
-        required=False,
+        required=True,
         help="Path to the Curriculum Vitae file (pdf)"
     )
     args = parser.parse_args()
