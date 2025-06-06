@@ -1,4 +1,4 @@
 import subprocess
 
-def setup():
+def setup() -> None:
     subprocess.run(["pre-commit", "install"], check=True)

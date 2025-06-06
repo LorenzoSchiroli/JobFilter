@@ -1,7 +1,3 @@
-
-
-#%% search phase
-
 from jobspy import scrape_jobs
 
 import pandas as pd
@@ -30,43 +26,54 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
+from typing import List
+
 load_dotenv()
 
 huggugface_token = os.environ.get("HUGGINGFACE_TOKEN")
 
 # login(token=huggugface_token)
 
-def get_jobs(generator):
+#%% search phase
+
+def get_jobs(generator: OllamaChatGenerator) -> pd.DataFrame:
+    """
+    Scrape job postings from various platforms, enrich them with company size
+    information, and return the resulting DataFrame.
+    """
     jobs = scrape_jobs(
         site_name=["indeed", "linkedin", "zip_recruiter", "glassdoor", "google"],
         search_term="software engineer",
-        google_search_term="software engineer jobs near Munich, BY since yesterday",
+        google_search_term=(
+            "software engineer jobs near Munich, BY since yesterday"
+        ),
         location="Munich, germany",
         results_wanted=10,
         hours_old=72,
-        country_indeed='Germany',
-        
-        # linkedin_fetch_description=True # gets more info such as description, direct job url (slower)
-        # proxies=["208.195.175.46:65095", "208.195.175.45:65095", "localhost"],
+        country_indeed="Germany",
     )
     print(f"Found {len(jobs)} jobs")
-    # print(jobs.head())
-    # jobs.to_csv("jobs.csv", quoting=csv.QUOTE_NONNUMERIC, escapechar="\\", index=False) # to_excel
-
-    # add company size information
-    unique_companies = jobs['company'].unique()
+    unique_companies = jobs["company"].unique()
     print("Number of companies:", len(unique_companies))
-    mapping = {company: get_company_size(company, generator) for company in tqdm(unique_companies)}
-    jobs['company_num_employees'] = jobs['company'].map(mapping)
-
+    mapping = {
+        company: get_company_size(company, generator)
+        for company in tqdm(unique_companies)
+    }
+    jobs["company_num_employees"] = jobs["company"].map(mapping)
     return jobs
 
 #%% indexing + ai phase
 
-def row2text(row, columns):
-    return '\n\n'.join([f"{col.upper()}\n{row[col]}" for col in columns])
+def row2text(row: pd.Series, columns: List[str]) -> str:
+    """
+    Convert a DataFrame row into a formatted string using specified columns.
+    """
+    return "\n\n".join([f"{col.upper()}\n{row[col]}" for col in columns])
 
-def df2text(jobs):
+def df2text(jobs: pd.DataFrame) -> List[str]:
+    """
+    Convert a DataFrame of job postings into a list of formatted strings.
+    """
     # convert to plain text
     jobs_strings = []
     for index, row in jobs.iterrows():
@@ -74,9 +81,9 @@ def df2text(jobs):
         jobs_strings.append(row_string)
     return jobs_strings
 
-def pdf_to_text(path):
+def pdf_to_text(path: str) -> str:
     """
-    Open pdf file and return plain text.
+    Open a PDF file and return its plain text content.
     """
 
     with open(path, "rb") as file:
@@ -86,52 +93,36 @@ def pdf_to_text(path):
             text += reader.pages[page].extract_text()
     return text
 
-def get_generator():
-    # LOCAL INFERENCE
-    # generator = HuggingFaceLocalGenerator(model="meta-llama/Llama-3.2-1B-Instruct",
-    #     task="text-generation",
-    #     generation_kwargs={
-    #     "max_new_tokens": 100,
-    #     "temperature": 0.3,
-    # })
-    # generator.warm_up()
-    
-    # ONLINE INFERENCE
-    # generator = HuggingFaceAPIGenerator(api_type="serverless_inference_api",
-    #     api_params={"model": "meta-llama/Llama-3.2-3B-Instruct"},
-    #     token=Secret.from_token(huggugface_token))
-    # index_query = generator.run(search_query_request)
-    # print(f"Inference time: {time.time() - start}")
-    # print(f"Total tokens {len(index_query['replies'][0])}")
-
-    # generator = HuggingFaceAPIChatGenerator(api_type="serverless_inference_api",
-    #     api_params={"model": "meta-llama/Llama-3.2-3B-Instruct"},
-    #     token=Secret.from_token(huggugface_token))
-    
-    # generator = HuggingFaceAPIChatGenerator(api_type="serverless_inference_api",
-    #     api_params={"model": "meta-llama/Llama-3.1-8B-Instruct"},
-    #     token=Secret.from_token(huggugface_token))
-    
-    generator = OllamaChatGenerator(model="llama3.2",
-        url = "http://localhost:11434",
+def get_generator() -> OllamaChatGenerator:
+    """
+    Initialize and return an instance of the OllamaChatGenerator.
+    """
+    generator = OllamaChatGenerator(
+        model="llama3.2",
+        url="http://localhost:11434",
         generation_kwargs={
             "num_predict": 200,
             "temperature": 0.5,
-            })
-    # generator = HuggingFaceLocalChatGenerator(
-    #     model="microsoft/Phi-3.5-mini-instruct",
-    #     task="text-generation",
-    # )
-    # generator.warm_up()
+        },
+    )
     return generator
 
-def get_search_query(cv, generator):
-    search_query_request = f"Curriculum vitae: \n<text-begin>\n {cv} \n<text-end>\n Generate a search query to find a job for this worker (10 words maximum). Don't add comments."
-    # Candidate's CV and the initial query format
-
+def get_search_query(cv: str, generator: OllamaChatGenerator) -> None:
+    """
+    Generate a search query based on the provided CV using the generator.
+    """
+    search_query_request = (
+        "Curriculum vitae: \n<text-begin>\n {cv} \n<text-end>\n "
+        "Generate a search query to find a job for this worker "
+        "(10 words maximum). Don't add comments."
+    )
     start = time.time()
-    messages = [ChatMessage.from_system("\\nYou are a helpful, respectful and honest assistant"),
-                ChatMessage.from_user(search_query_request)]
+    messages = [
+        ChatMessage.from_system(
+            "\\nYou are a helpful, respectful and honest assistant"
+        ),
+        ChatMessage.from_user(search_query_request),
+    ]
     response = generator.run(messages)
     reply_query = response["replies"][0]
     index_query = reply_query.text
@@ -141,139 +132,188 @@ def get_search_query(cv, generator):
 
     print(f"Inference time: {time.time() - start}")
     print(f"Total words {index_query.count(' ') + 1}")
-
     print("Reply:", index_query)
 
-def filter_jobs(jobs_info, cv, generator):
-
-    # rearch query was here
-
+def filter_jobs(
+    jobs_info: pd.DataFrame, cv: str, generator: OllamaChatGenerator
+) -> List[str]:
+    """
+    Filter job postings based on the CV and generator, returning a list of matched
+    job descriptions.
+    """
     jobs_text = df2text(jobs_info)
 
-    documents_all = [Document(content=jo, id=i+1) for i, jo in enumerate(jobs_text)]
+    documents_all = [
+        Document(content=jo, id=i + 1) for i, jo in enumerate(jobs_text)
+    ]
     document_store = InMemoryDocumentStore()
-    # document_writer = DocumentWriter(document_store=document_store, policy=DuplicatePolicy.OVERWRITE)
     document_store.write_documents(documents_all)
-    # document_writer.run(documents=documents)
     print("Documents count:", document_store.count_documents())
     retriever = InMemoryBM25Retriever(document_store=document_store)
 
-    messages = [ChatMessage.from_system("\\nYou are a helpful, respectful and honest assistant")]
-    messages.append(ChatMessage.from_user("Extract a search query form the CV to find the best suited job, use fiew keywords (10 maximum). Just write the query without comments. The CV: \n" + cv))
+    messages = [
+        ChatMessage.from_system("\\nYou are a helpful, respectful and honest assistant")
+    ]
+    messages.append(
+        ChatMessage.from_user(
+            "Extract a search query form the CV to find the best suited job, use few "
+            "keywords (10 maximum). Just write the query without comments. The CV: \n"
+            + cv
+        )
+    )
     response = generator.run(messages)
     index_query = response["replies"][0].text
 
     documents_candidate = retriever.run(query=index_query)["documents"]
 
     matched_jobs = []
-    # messages.append(reply_query)
     for document in tqdm(documents_candidate):
-        is_match = job_match(generator, messages, jobs_info.iloc[document.id-1], document.content)
+        is_match = job_match(
+            generator, messages, jobs_info.iloc[document.id - 1], document.content
+        )
         if is_match:
             matched_jobs.append(document.content)
 
     return matched_jobs
 
-def is_full_time(job_offer_text):
-    full_time_keywords = ['full-time', 'full time', 'permanent', 'regular', 'fulltime']
-    part_time_keywords = ['part-time', 'part time', 'parttime','freelance', 'hourly', "internship"]
+def is_full_time(job_offer_text: str) -> bool:
+    """
+    Determine if a job offer is for a full-time position based on its text.
+    """
+    full_time_keywords = ["full-time", "full time", "permanent", "regular", "fulltime"]
+    part_time_keywords = [
+        "part-time", "part time", "parttime", "freelance", "hourly", "internship"
+    ]
     job_offer_text = job_offer_text.lower()
-    found_full_time = any([full_time_keyword in job_offer_text for full_time_keyword in full_time_keywords])
-    found_part_time = any([part_time_keyword in job_offer_text for part_time_keyword in part_time_keywords])
-    if found_full_time or (not found_full_time and not found_part_time):
-        return True
-    else:
-        return False
-    
+    found_full_time = any(
+        full_time_keyword in job_offer_text for full_time_keyword in full_time_keywords
+    )
+    found_part_time = any(
+        part_time_keyword in job_offer_text for part_time_keyword in part_time_keywords
+    )
+    return found_full_time or (not found_full_time and not found_part_time)
 
-def rule_based_filtering(job_info):
-
+def rule_based_filtering(job_info: pd.Series) -> bool:
+    """
+    Apply rule-based filtering to a job posting to determine if it meets predefined
+    criteria.
+    """
     checks = {}
     job_text = job_info["description"].lower()
-    checks["junior_mid"] = "senior" not in job_text # risky
-    checks["english_text"] = True if detect(job_info["description"]) == "en" else False
+    checks["junior_mid"] = "senior" not in job_text
+    checks["english_text"] = detect(job_info["description"]) == "en"
     checks["company_established"] = "startup" not in job_text
     checks["full_time"] = is_full_time(job_text)
-    checks["remote"] = any([keyword in job_text for keyword in ["remote", "home", "teleworking"]])
-    checks["company_size"] = True if pd.isna(job_info["company_num_employees"]) or job_info["company_num_employees"] > 100 else False
-    checks["permament_position"] = not any([keyword in job_text for keyword in ["internship", "trainee", "fellowship"]])
-    checks["mlops"] = any([keyword in job_text for keyword in ["mlops", "AWS", "cloud", "mlflow", "CI/CD", "deploy"]])
+    checks["remote"] = any(
+        keyword in job_text for keyword in ["remote", "home", "teleworking"]
+    )
+    checks["company_size"] = (
+        pd.isna(job_info["company_num_employees"])
+        or job_info["company_num_employees"] > 100
+    )
+    checks["permament_position"] = not any(
+        keyword in job_text for keyword in ["internship", "trainee", "fellowship"]
+    )
+    checks["mlops"] = any(
+        keyword in job_text
+        for keyword in ["mlops", "AWS", "cloud", "mlflow", "CI/CD", "deploy"]
+    )
+    return all(checks.values())
 
-    return all([value for key, value in checks.items()])
+def llm_based_filtering(
+    generator: OllamaChatGenerator, messages: List[ChatMessage], job_text: str
+) -> bool:
+    """
+    Use an LLM-based approach to filter job postings based on predefined conditions.
+    """
+    match_request = (
+        f"Job Offer: \n\n<text-begin>\n {job_text} \n<text-end>\n\n"
+        "The following list are job offer conditions, check each condition if it is "
+        "True or False. If a condition is unclear or not specified consider it as "
+        "None.\nJob offer conditions:\n"
+        '- "junior_mid": check if the job offer\'s role is a junior or mid-level role '
+        "and not an advanced senior role.\n"
+        '- "english_text": check if the description is written in english.\n'
+        '- "company_established": check if the job offer\'s company is an established '
+        "company (not a startup).\n"
+        '- "full_time": check if the job is a full-time job or has the option to work '
+        "full-time.\n"
+        '- "remote": check if the job is truly fully remote without specifications '
+        "regarding office returns.\n"
+        '- "company_size": check if the job offer\'s company has more than 100 '
+        "employees.\n"
+        '- "permament_position": check if the job is a normal job and not an '
+        "internship.\n"
+        "Moreover, check if the curriculum vitae role ambitions match with the the "
+        "job offer role. Answer true or false or null.\n\n"
+        "Don't explain details, write output as a json file.\nOutput example:\n\n"
+        "{\n"
+        '    "junior_mid": null,\n'
+        '    "english_text": null,\n'
+        '    "company_established": null,\n'
+        '    "full_time": null,\n'
+        '    "remote": null,\n'
+        '    "company_size": null,\n'
+        '    "permament_position": null,\n'
+        '    "match": null\n'
+        "}"
+    )
 
-
-def llm_based_filtering(generator, messages, job_text):
-    match_request = f"Job Offer: \n\n<text-begin>\n {job_text} \n<text-end>\n\n" \
-"""
-The following list are job offer conditions, check each condition if it is True or False. 
-If a condition is unclear or not specified consider it as None.
-Job offer conditions:
-- "junior_mid": check if the job offer's role is a junior or mid-level role and not an advanced senor role.
-- "english_text": check if the description is written in english.
-- "company_established": check if the job offer's company is an established company (not a startup).
-- "full_time": check if the job is a full-time job or has the option to work full-time.
-- "remote": check if the job is truly fully remote without specifications regarding office returns.
-- "company_size": check if the job offer's company has more than 100 employees.
-- "permament_position": check if the job is a normal job and not an internship.
-""" \
-        "\nMoreover, check if the curriculum vitae role ambitions match with the the job offer role. Answer true or false or null. \n \n" \
-        """
-Don't explain details, write output as a json file.
-Output example:
-
-{
-    "junior_mid": null,
-    "english_text": null,
-    "company_established": null,
-    "full_time": null,
-    "reomte": null,
-    "company_size": null,
-    "permament_position": null,
-    "match": null
-}
-"""
-    # "If all conditions are NOT FALSE and the job offer is a MATCH, answer just PASSED, otherwise FAILED." \
-        
     messages_side = copy.deepcopy(messages)
     messages_side.append(ChatMessage.from_user(match_request))
     response = generator.run(messages_side)
     reply_match = response["replies"][0].text
     try:
-        reply_match = reply_match.replace("\n", "") #.replace("true", "True").replace("false", "False").replace("null", "None").replace("none", "None")
-        match = re.search(r'(\{.*?\})', reply_match)
-        json_text = match.group(1) if match else {}
+        reply_match = reply_match.replace("\n", "")
+        match = re.search(r"(\{.*?\})", reply_match)
+        json_text = str(match.group(1) if match else {})
         reply_match = json.loads(json_text)
     except Exception:
         reply_match = {}
 
     print(reply_match)
 
-    return all([value for key, value in reply_match.items()])
+    return all(reply_match.values())
 
-
-def job_match(generator, messages, job_info, job_text):
-
+def job_match(
+    generator: OllamaChatGenerator,
+    messages: List[ChatMessage],
+    job_info: pd.Series,
+    job_text: str,
+) -> bool:
+    """
+    Determine if a job posting matches the candidate's profile using both rule-based
+    and LLM-based filtering.
+    """
     if pd.isna(job_info["description"]):
         return False
-    
+
     check_rules = rule_based_filtering(job_info)
 
     if not check_rules:
         return False
-    
+
     check_llm = llm_based_filtering(generator, messages, job_text)
 
     return check_llm
 
 
-def get_example():
+def get_example() -> tuple[pd.DataFrame, str]:
+    """
+    Return example job postings and a sample CV for testing purposes.
+    """
     jobs = [
     """
 Job Offer 1: Remote Full Stack Developer at Tech Innovators Inc.
 Location: Remote
 Salary: $90,000 - $110,000 per year
 Description:
-Tech Innovators Inc. is seeking a talented Full Stack Developer to join our dynamic team. The ideal candidate will have experience with JavaScript frameworks (React preferred), Node.js for backend development, and familiarity with AWS services. You will work on exciting projects that involve building scalable applications and collaborating with product managers and designers.
+Tech Innovators Inc. is seeking a talented Full Stack Developer to
+join our dynamic team. The ideal candidate will have experience
+with JavaScript frameworks (React preferred), Node.js for backend
+development, and familiarity with AWS services. You will work on
+exciting projects that involve building scalable applications and
+collaborating with product managers and designers.
 Requirements:
 Proficiency in JavaScript (React) and Node.js.
 Experience with RESTful APIs.
@@ -285,7 +325,11 @@ Job Offer 2: Remote Data Analyst at Data Insights Corp.
 Location: Remote
 Salary: $70,000 - $85,000 per year
 Description:
-Data Insights Corp. is looking for a Remote Data Analyst to help us interpret data trends and provide actionable insights. The role requires proficiency in data analysis tools but does not require extensive programming knowledge. You will work closely with marketing teams to optimize campaigns based on data findings.
+Data Insights Corp. is looking for a Remote Data Analyst to help
+ us interpret data trends and provide actionable insights.
+ The role requires proficiency in data analysis tools but does
+ not require extensive programming knowledge. You will work closely
+ with marketing teams to optimize campaigns based on data findings.
 Requirements:
 Experience with data visualization tools (Tableau or Power BI).
 Basic knowledge of SQL.
@@ -297,7 +341,11 @@ Job Offer 3: Remote Graphic Designer at Creative Minds Studio
 Location: Remote
 Salary: $50,000 - $65,000 per year
 Description:
-Creative Minds Studio is hiring a Remote Graphic Designer to create visually appealing designs for our clients. The ideal candidate should have experience in graphic design software such as Adobe Photoshop and Illustrator. This role does not involve any coding or software development tasks.
+Creative Minds Studio is hiring a Remote Graphic Designer to create
+visually appealing designs for our clients. The ideal candidate
+should have experience in graphic design software such as Adobe
+Photoshop and Illustrator. This role does not involve any coding
+or software development tasks.
 Requirements:
 Proficiency in graphic design software (Photoshop, Illustrator).
 Strong portfolio showcasing design work.
@@ -314,7 +362,11 @@ Phone: +1 (555) 123-4567
 Location: Remote (Based in San Francisco, CA)
 LinkedIn: linkedin.com/in/johndoe
 Summary
-Detail-oriented and innovative Software Engineer with over 5 years of experience in full-stack development and a strong background in designing scalable web applications. Proficient in JavaScript, Python, and Java, with a passion for developing efficient code and optimizing user experiences. Seeking to leverage expertise in a challenging remote position.
+Detail-oriented and innovative Software Engineer with over 5 years of experience
+in full-stack development and a strong background in designing scalable web
+applications. Proficient in JavaScript, Python, and Java, with a passion for
+developing efficient code and optimizing user experiences. Seeking to leverage
+expertise in a challenging remote position.
 Technical Skills
 Languages: JavaScript, Python, Java, C++
 Frameworks: React, Node.js, Django, Spring Boot
@@ -326,7 +378,8 @@ Software Engineer
 ABC Tech Solutions | Remote
 June 2021 – Present
 Developed and maintained scalable web applications using React and Node.js.
-Collaborated with cross-functional teams to define project requirements and deliver high-quality software solutions.
+Collaborated with cross-functional teams to define project requirements and
+deliver high-quality software solutions.
 Implemented RESTful APIs to enhance application functionality and performance.
 Junior Software Developer
 XYZ Innovations | San Francisco, CA
@@ -341,12 +394,17 @@ Certifications
 Certified AWS Solutions Architect – Associate
 Full Stack Web Development Certificate (Coursera)
 Projects
-Personal Portfolio Website: Designed a responsive portfolio showcasing projects using HTML, CSS, JavaScript.
-Task Management App: Developed a task management application with user authentication using Django and React.
+Personal Portfolio Website: Designed a responsive portfolio showcasing projects
+using HTML, CSS, JavaScript.
+Task Management App: Developed a task management application with user
+authentication using Django and React.
     """
     return jobs, cv
 
-def find_jobs(cv_path):
+def find_jobs(cv_path: str) -> List[str]:
+    """
+    Find and filter job postings based on the provided CV file path.
+    """
     generator = get_generator()
     # jobs, cv = get_example()
     cv = pdf_to_text(cv_path)
@@ -367,10 +425,10 @@ def find_jobs(cv_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Input a Curriculum Vitae file.")
     parser.add_argument(
-        '-f', '--file', 
-        type=str, 
-        required=False, 
-        help='Path to the Curriculum Vitae file (pdf)'
+        "-f", "--file",
+        type=str,
+        required=False,
+        help="Path to the Curriculum Vitae file (pdf)"
     )
     args = parser.parse_args()
 
