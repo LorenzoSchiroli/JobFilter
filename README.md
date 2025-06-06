@@ -19,6 +19,14 @@ poetry install && poetry run setup
 
 **Note**: substitute poetry with uv (seems better)
 
+## Run
+
+Run with:
+
+```python
+python src/jobfilter/search.py --file data/fake_ml_engineer_cv.pdf
+```
+
 ## Behavior
 
 Input:
